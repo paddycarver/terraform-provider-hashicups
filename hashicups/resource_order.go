@@ -2,215 +2,313 @@ package hashicups
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"time"
 
-	hc "github.com/hashicorp-demoapp/hashicups-client-go"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/hashicorp-demoapp/hashicups-client-go"
+	"github.com/hashicorp/terraform-plugin-framework/schema"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
+	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 )
 
-func resourceOrder() *schema.Resource {
-	return &schema.Resource{
-		CreateContext: resourceOrderCreate,
-		ReadContext:   resourceOrderRead,
-		UpdateContext: resourceOrderUpdate,
-		DeleteContext: resourceOrderDelete,
-		Schema: map[string]*schema.Schema{
-			"last_updated": &schema.Schema{
-				Type:     schema.TypeString,
-				Optional: true,
+type resourceOrderType struct{}
+
+//Create the schema for the resource - what attributes are expected of a resource & what does it look like? Nested attributes feel weird
+func (r resourceOrderType) GetSchema(_ context.Context) (schema.Schema, []*tfprotov6.Diagnostic) {
+	return schema.Schema{
+		Attributes: map[string]schema.Attribute{
+			"orderID": {
+				Type:     types.StringType,
 				Computed: true,
 			},
-			"items": &schema.Schema{
-				Type:     schema.TypeList,
+			"last_updated": {
+				Type: types.StringType,
+				// provider will set value, user cannot specify
+				Computed: true,
+			},
+			"items": {
+				//tf will throw error if user doesn't specify palue - optional - can or choose not to supply a value
 				Required: true,
-				Elem: &schema.Resource{
-					Schema: map[string]*schema.Schema{
-						"coffee": &schema.Schema{
-							Type:     schema.TypeList,
-							MaxItems: 1,
-							Required: true,
-							Elem: &schema.Resource{
-								Schema: map[string]*schema.Schema{
-									"id": &schema.Schema{
-										Type:     schema.TypeInt,
-										Required: true,
-									},
-									"name": &schema.Schema{
-										Type:     schema.TypeString,
-										Computed: true,
-									},
-									"teaser": &schema.Schema{
-										Type:     schema.TypeString,
-										Computed: true,
-									},
-									"description": &schema.Schema{
-										Type:     schema.TypeString,
-										Computed: true,
-									},
-									"price": &schema.Schema{
-										Type:     schema.TypeInt,
-										Computed: true,
-									},
-									"image": &schema.Schema{
-										Type:     schema.TypeString,
-										Computed: true,
-									},
-								},
+				Attributes: schema.ListNestedAttributes(map[string]schema.Attribute{
+					"coffee": {
+						Required: true,
+						Attributes: schema.ListNestedAttributes(map[string]schema.Attribute{
+							"id": {
+								Type:     types.NumberType,
+								Required: true,
 							},
-						},
-						"quantity": &schema.Schema{
-							Type:     schema.TypeInt,
-							Required: true,
-						},
+							"name": {
+								Type:     types.StringType,
+								Computed: true,
+							},
+							"teaser": {
+								Type:     types.StringType,
+								Computed: true,
+							},
+							"description": {
+								Type:     types.StringType,
+								Computed: true,
+							},
+							"price": {
+								Type:     types.NumberType,
+								Computed: true,
+							},
+							"image": {
+								Type:     types.StringType,
+								Computed: true,
+							},
+						}, schema.ListNestedAttributesOptions{}),
 					},
-				},
+					"quantity": {
+						Type:     types.NumberType,
+						Required: true,
+					},
+				}, schema.ListNestedAttributesOptions{}),
 			},
 		},
-	}
+	}, nil
 }
 
-func resourceOrderCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*hc.Client)
+type resourceOrder struct {
+	p provider
+}
 
-	// Warning or errors can be collected in a slice type
-	var diags diag.Diagnostics
+// new resource instance
+func (r resourceOrderType) NewResource(_ context.Context, p tfsdk.Provider) (tfsdk.Resource, []*tfprotov6.Diagnostic) {
+	return resourceOrder{
+		p: *(p.(*provider)),
+	}, nil
+}
 
-	items := d.Get("items").([]interface{})
-	ois := []hc.OrderItem{}
+type resourceCoffeeData struct {
+	Id          int          `tfsdk:"id"`
+	Name        types.String `tfsdk:"name"`
+	Teaser      types.String `tfsdk:"teaser"`
+	Description types.String `tfsdk:"description"`
+	Price       float64      `tfsdk:"price"`
+	Image       types.String `tfsdk:"image"`
+}
 
-	for _, item := range items {
-		i := item.(map[string]interface{})
+type resourceItemData struct {
+	coffee   resourceCoffeeData
+	quantity int `tfsdk:"quantity"`
+}
 
-		co := i["coffee"].([]interface{})[0]
-		coffee := co.(map[string]interface{})
+type resourceOrderData struct {
+	items        []resourceItemData
+	last_updated types.String `tfsdk:"last_updated"`
+	orderID      int          `tfsdk:"orderID"`
+}
 
-		oi := hc.OrderItem{
-			Coffee: hc.Coffee{
-				ID: coffee["id"].(int),
+//create a new resource
+func (r resourceOrder) Create(ctx context.Context, req tfsdk.CreateResourceRequest, resp *tfsdk.CreateResourceResponse) {
+	if !r.p.configured {
+		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
+			Severity: tfprotov6.DiagnosticSeverityError,
+			Summary:  "Provider not configured",
+			Detail:   "The provider hasn't been configured before apply, likely because it depends on an unknown value from another resource. This leads to weird stuff happening, so we'd prefer if you didn't do that. Thanks!",
+		})
+		return
+	}
+	var ticket resourceOrderData
+	err := req.Plan.Get(ctx, &ticket)
+	if err != nil {
+		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
+			Severity: tfprotov6.DiagnosticSeverityError,
+			Summary:  "Error reading plan",
+			Detail:   "An unexpected error was encountered while reading the plan: " + err.Error(),
+		})
+		return
+	}
+
+	var items []hashicups.OrderItem
+
+	for _, item := range ticket.items {
+		items = append(items, hashicups.OrderItem{
+			Coffee: hashicups.Coffee{
+				ID: item.coffee.Id,
 			},
-			Quantity: i["quantity"].(int),
-		}
-
-		ois = append(ois, oi)
+			Quantity: item.quantity,
+		})
 	}
-
-	o, err := c.CreateOrder(ois)
+	order, err := r.p.client.CreateOrder(items)
 	if err != nil {
-		return diag.FromErr(err)
+		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
+			Severity: tfprotov6.DiagnosticSeverityError,
+			Summary:  "Error creating order",
+			Detail:   "Could not create order, unexpected error: " + err.Error(),
+		})
+		return
 	}
-
-	d.SetId(strconv.Itoa(o.ID))
-
-	resourceOrderRead(ctx, d, m)
-
-	return diags
-}
-
-func resourceOrderRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*hc.Client)
-
-	// Warning or errors can be collected in a slice type
-	var diags diag.Diagnostics
-
-	orderID := d.Id()
-
-	order, err := c.GetOrder(orderID)
-	if err != nil {
-		return diag.FromErr(err)
-	}
-
-	orderItems := flattenOrderItems(&order.Items)
-	if err := d.Set("items", orderItems); err != nil {
-		return diag.FromErr(err)
-	}
-
-	return diags
-}
-
-func resourceOrderUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*hc.Client)
-
-	orderID := d.Id()
-
-	if d.HasChange("items") {
-		items := d.Get("items").([]interface{})
-		ois := []hc.OrderItem{}
-
-		for _, item := range items {
-			i := item.(map[string]interface{})
-
-			co := i["coffee"].([]interface{})[0]
-			coffee := co.(map[string]interface{})
-
-			oi := hc.OrderItem{
-				Coffee: hc.Coffee{
-					ID: coffee["id"].(int),
-				},
-				Quantity: i["quantity"].(int),
+	ticket.orderID = order.ID
+	now := time.Now().Format(time.RFC850)
+	ticket.last_updated = types.String{Value: string(now)}
+	for _, planItem := range ticket.items {
+		for _, item := range order.Items {
+			if item.Coffee.ID == planItem.coffee.Id {
+				planItem.coffee.Name = types.String{Value: item.Coffee.Name}
+				planItem.coffee.Teaser = types.String{Value: item.Coffee.Teaser}
+				planItem.coffee.Description = types.String{Value: item.Coffee.Description}
+				planItem.coffee.Price = item.Coffee.Price
+				planItem.coffee.Image = types.String{Value: item.Coffee.Image}
 			}
-			ois = append(ois, oi)
 		}
-
-		_, err := c.UpdateOrder(orderID, ois)
-		if err != nil {
-			return diag.FromErr(err)
-		}
-
-		d.Set("last_updated", time.Now().Format(time.RFC850))
 	}
-
-	return resourceOrderRead(ctx, d, m)
-}
-
-func resourceOrderDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*hc.Client)
-
-	// Warning or errors can be collected in a slice type
-	var diags diag.Diagnostics
-
-	orderID := d.Id()
-
-	err := c.DeleteOrder(orderID)
+	err = resp.State.Set(ctx, order)
 	if err != nil {
-		return diag.FromErr(err)
+		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
+			Severity: tfprotov6.DiagnosticSeverityError,
+			Summary:  "Error setting state",
+			Detail:   "Could not set state, unexpected error: " + err.Error(),
+		})
+		return
 	}
-
-	// d.SetId("") is automatically called assuming delete returns no errors, but
-	// it is added here for explicitness.
-	d.SetId("")
-
-	return diags
 }
 
-func flattenOrderItems(orderItems *[]hc.OrderItem) []interface{} {
-	if orderItems != nil {
-		ois := make([]interface{}, len(*orderItems), len(*orderItems))
+//Read
+func (r resourceOrder) Read(ctx context.Context, req tfsdk.ReadResourceRequest, resp *tfsdk.ReadResourceResponse) {
+	fmt.Fprintln(stderr, "[DEBUG] Got state in provider:", req.State.Raw)
+	var state resourceOrderData
+	err := req.State.Get(ctx, &state)
+	if err != nil {
+		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
+			Severity: tfprotov6.DiagnosticSeverityError,
+			Summary:  "Error reading state",
+			Detail:   "An unexpected error was encountered while reading the state: " + err.Error(),
+		})
+		return
+	}
+	// get order from API and then update what is in state from what the API returns
 
-		for i, orderItem := range *orderItems {
-			oi := make(map[string]interface{})
-
-			oi["coffee"] = flattenCoffee(orderItem.Coffee)
-			oi["quantity"] = orderItem.Quantity
-
-			ois[i] = oi
-		}
-
-		return ois
+	//Set on state var state resourceOrderData will hold what the API returns
+	order, err := r.p.client.GetOrder(strconv.Itoa(state.orderID))
+	if err != nil {
+		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
+			Severity: tfprotov6.DiagnosticSeverityError,
+			Summary:  "Error creating order",
+			Detail:   "Could not create order, unexpected error: " + err.Error(),
+		})
+		return
 	}
 
-	return make([]interface{}, 0)
+	state.items = []resourceItemData{}
+	for _, item := range order.Items {
+		state.items = append(state.items, resourceItemData{
+			coffee: resourceCoffeeData{
+				Name:        types.String{Value: item.Coffee.Name},
+				Teaser:      types.String{Value: item.Coffee.Teaser},
+				Description: types.String{Value: item.Coffee.Description},
+				Price:       item.Coffee.Price,
+				Image:       types.String{Value: item.Coffee.Image},
+				Id:          item.Coffee.ID,
+			},
+			quantity: item.Quantity,
+		})
+	}
+
+	if err != nil {
+		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
+			Severity: tfprotov6.DiagnosticSeverityError,
+			Summary:  "Error setting state",
+			Detail:   "Unexpected error encountered trying to set new state: " + err.Error(),
+		})
+		return
+	}
 }
 
-func flattenCoffee(coffee hc.Coffee) []interface{} {
-	c := make(map[string]interface{})
-	c["id"] = coffee.ID
-	c["name"] = coffee.Name
-	c["teaser"] = coffee.Teaser
-	c["description"] = coffee.Description
-	c["price"] = coffee.Price
-	c["image"] = coffee.Image
+//update
+func (r resourceOrder) Update(ctx context.Context, req tfsdk.UpdateResourceRequest, resp *tfsdk.UpdateResourceResponse) {
+	var plan resourceOrderData
+	err := req.Plan.Get(ctx, &plan)
+	if err != nil {
+		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
+			Severity: tfprotov6.DiagnosticSeverityError,
+			Summary:  "Error reading plan",
+			Detail:   "An unexpected error was encountered while reading the plan: " + err.Error(),
+		})
+		return
+	}
+	var state resourceOrderData
+	err = req.State.Get(ctx, &state)
+	if err != nil {
+		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
+			Severity: tfprotov6.DiagnosticSeverityError,
+			Summary:  "Error reading prior state",
+			Detail:   "An unexpected error was encountered while reading the prior state: " + err.Error(),
+		})
+		return
+	}
 
-	return []interface{}{c}
+	var items []hashicups.OrderItem
+
+	for _, item := range plan.items {
+		items = append(items, hashicups.OrderItem{
+			Coffee: hashicups.Coffee{
+				ID: item.coffee.Id,
+			},
+			Quantity: item.quantity,
+		})
+	}
+	order, err := r.p.client.UpdateOrder(strconv.Itoa(state.orderID), []hashicups.OrderItem{})
+	if err != nil {
+		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
+			Severity: tfprotov6.DiagnosticSeverityError,
+			Summary:  "Error updating order",
+			Detail:   "Could not update order, unexpected error: " + err.Error(),
+		})
+		return
+	}
+	state.items = []resourceItemData{}
+	for _, item := range order.Items {
+		state.items = append(state.items, resourceItemData{
+			coffee: resourceCoffeeData{
+				Name:        types.String{Value: item.Coffee.Name},
+				Teaser:      types.String{Value: item.Coffee.Teaser},
+				Description: types.String{Value: item.Coffee.Description},
+				Price:       item.Coffee.Price,
+				Image:       types.String{Value: item.Coffee.Image},
+				Id:          item.Coffee.ID,
+			},
+			quantity: item.Quantity,
+		})
+	}
+	err = resp.State.Set(ctx, order)
+	if err != nil {
+		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
+			Severity: tfprotov6.DiagnosticSeverityError,
+			Summary:  "Error setting state",
+			Detail:   "Could not set state, unexpected error: " + err.Error(),
+		})
+		return
+	}
+}
+
+//Delete
+
+func (r resourceOrder) Delete(ctx context.Context, req tfsdk.DeleteResourceRequest, resp *tfsdk.DeleteResourceResponse) {
+	var state resourceOrderData
+	err := req.State.Get(ctx, &state)
+	if err != nil {
+		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
+			Severity: tfprotov6.DiagnosticSeverityError,
+			Summary:  "Error reading configuration",
+			Detail:   "An unexpected error was encountered while reading the configuration: " + err.Error(),
+		})
+		return
+	}
+	// original framework test provider created a file on the file system and needed to destroy an on disk
+	// Would delete in hashicups be removing the item from the state and API?
+	//call hashicups API for DeleteOrder
+	err = r.p.client.DeleteOrder(strconv.Itoa(state.orderID))
+	if err != nil {
+		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
+			Severity: tfprotov6.DiagnosticSeverityError,
+			Summary:  "Error deleting order",
+			Detail:   "Could not delete orderID " + strconv.Itoa(state.orderID) + ": " + err.Error(),
+		})
+		return
+	}
+	resp.State.RemoveResource(ctx)
 }

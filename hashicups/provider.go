@@ -2,84 +2,181 @@ package hashicups
 
 import (
 	"context"
+	"os"
 
 	"github.com/hashicorp-demoapp/hashicups-client-go"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/hashicorp/terraform-plugin-framework/schema"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
+	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 )
 
-// Provider -
-func Provider() *schema.Provider {
-	return &schema.Provider{
-		Schema: map[string]*schema.Schema{
-			"host": &schema.Schema{
-				Type:        schema.TypeString,
-				Optional:    true,
-				DefaultFunc: schema.EnvDefaultFunc("HASHICUPS_HOST", nil),
-			},
-			"username": &schema.Schema{
-				Type:        schema.TypeString,
-				Optional:    true,
-				DefaultFunc: schema.EnvDefaultFunc("HASHICUPS_USERNAME", nil),
-			},
-			"password": &schema.Schema{
-				Type:        schema.TypeString,
-				Optional:    true,
-				Sensitive:   true,
-				DefaultFunc: schema.EnvDefaultFunc("HASHICUPS_PASSWORD", nil),
-			},
-		},
-		ResourcesMap: map[string]*schema.Resource{
-			"hashicups_order": resourceOrder(),
-		},
-		DataSourcesMap: map[string]*schema.Resource{
-			"hashicups_coffees":     dataSourceCoffees(),
-			"hashicups_ingredients": dataSourceIngredients(),
-			"hashicups_order":       dataSourceOrder(),
-		},
-		ConfigureContextFunc: providerConfigure,
-	}
+var stderr = os.Stderr
+
+func New() tfsdk.Provider {
+	return &provider{}
 }
 
-func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}, diag.Diagnostics) {
-	username := d.Get("username").(string)
-	password := d.Get("password").(string)
+type provider struct {
+	configured bool
+	client     *hashicups.Client
+}
 
-	var host *string
+// GetSchema
+func (p *provider) GetSchema(_ context.Context) (schema.Schema, []*tfprotov6.Diagnostic) {
+	return schema.Schema{
+		Attributes: map[string]schema.Attribute{
+			"host": {
+				Type:     types.StringType,
+				Optional: true,
+				Computed: true,
+			},
+			"username": {
+				Type:     types.StringType,
+				Optional: true,
+				Computed: true,
+			},
+			"password": {
+				Type:      types.StringType,
+				Optional:  true,
+				Computed:  true,
+				Sensitive: true,
+			},
+		},
+	}, nil
+}
 
-	hVal, ok := d.GetOk("host")
-	if ok {
-		tempHost := hVal.(string)
-		host = &tempHost
-	}
+// Configure
 
-	// Warning or errors can be collected in a slice type
-	var diags diag.Diagnostics
+type providerData struct {
+	username types.String `tfsdk:"username"`
+	host     types.String `tfsdk:"host"`
+	password types.String `tfsdk:"password"`
+}
 
-	if (username != "") && (password != "") {
-		c, err := hashicups.NewClient(host, &username, &password)
-		if err != nil {
-			diags = append(diags, diag.Diagnostic{
-				Severity: diag.Error,
-				Summary:  "Unable to create HashiCups client",
-				Detail:   "Unable to authenticate user for authenticated HashiCups client",
-			})
+func (p *provider) Configure(ctx context.Context, req tfsdk.ConfigureProviderRequest, resp *tfsdk.ConfigureProviderResponse) {
 
-			return nil, diags
-		}
+	// after providerData config.username,config.password etc
+	var config providerData
 
-		return c, diags
-	}
-
-	c, err := hashicups.NewClient(host, nil, nil)
+	err := req.Config.Get(ctx, &config)
 	if err != nil {
-		diags = append(diags, diag.Diagnostic{
-			Severity: diag.Error,
-			Summary:  "Unable to create HashiCups client",
-			Detail:   "Unable to create anonymous HashiCups client",
+		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
+			Severity: tfprotov6.DiagnosticSeverityError,
+			Summary:  "Error parsing configuration",
+			Detail:   "Error parsing the configuration, this is an error in the provider. Please report the following to the provider developer:\n\n" + err.Error(),
 		})
-		return nil, diags
+		return
 	}
 
-	return c, diags
+	var username string
+
+	if config.username.Unknown {
+		//cannot connect to client with an unknown value
+		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
+			Severity: tfprotov6.DiagnosticSeverityWarning,
+			Summary:  "Unable to create client",
+			Detail:   "Cannot use unknown value as username",
+		})
+		return
+	}
+
+	if config.username.Null {
+		username = os.Getenv("HASHICUPS_USERNAME")
+	} else {
+		username = config.username.Value
+	}
+
+	if username == "" {
+		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
+			// error vs warning - empty value must stop execution
+			Severity: tfprotov6.DiagnosticSeverityError,
+			Summary:  "Unable to find username",
+			Detail:   "Username cannot be an empty string",
+		})
+	}
+
+	var password string
+
+	if config.password.Unknown {
+		//cannot connect to client with an unknown value
+		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
+			Severity: tfprotov6.DiagnosticSeverityWarning,
+			Summary:  "Unable to create client",
+			Detail:   "Cannot use unknown value as password",
+		})
+		return
+	}
+
+	if config.password.Null {
+		password = os.Getenv("HASHICUPS_PASSWORD")
+	} else {
+		password = config.password.Value
+	}
+
+	if password == "" {
+		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
+			// error vs warning - empty value must stop execution
+			Severity: tfprotov6.DiagnosticSeverityError,
+			Summary:  "Unable to find password",
+			Detail:   "password cannot be an empty string",
+		})
+	}
+
+	var host string
+
+	if config.host.Unknown {
+		//cannot connect to client with an unknown value
+		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
+			Severity: tfprotov6.DiagnosticSeverityWarning,
+			Summary:  "Unable to create client",
+			Detail:   "Cannot use unknown value as host",
+		})
+		return
+	}
+
+	if config.host.Null {
+		host = os.Getenv("HASHICUPS_HOST")
+	} else {
+		host = config.host.Value
+	}
+
+	if host == "" {
+		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
+			// error vs warning - empty value must stop execution
+			Severity: tfprotov6.DiagnosticSeverityError,
+			Summary:  "Unable to find host",
+			Detail:   "Host cannot be an empty string",
+		})
+	}
+
+	//repeat for password & host
+
+	c, err := hashicups.NewClient(&config.host.Value, nil, nil)
+	if err != nil {
+		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
+			Severity: tfprotov6.DiagnosticSeverityError,
+			Summary:  "Unable to create client",
+			Detail:   "Unable to create hashicups client:\n\n" + err.Error(),
+		})
+		return
+	}
+	p.client = c
+}
+
+// GetResources
+
+func (p *provider) GetResources(_ context.Context) (map[string]tfsdk.ResourceType, []*tfprotov6.Diagnostic) {
+	return map[string]tfsdk.ResourceType{
+		"hashicups_order": resourceOrderType{},
+	}, nil
+}
+
+//GetDataSources
+func (p *provider) GetDataSources(_ context.Context) (map[string]tfsdk.DataSourceType, []*tfprotov6.Diagnostic) {
+	return map[string]tfsdk.DataSourceType{
+		//	"hashicups_coffees":     dataSourceCoffeesType{},
+		//	"hashicups_ingredients": dataSourceIngredientsType{},
+		//	"hashicups_order":       dataSourceOrderType{},
+	}, nil
 }
