@@ -20,9 +20,6 @@ func New() tfsdk.Provider {
 type provider struct {
 	configured bool
 	client     *hashicups.Client
-	host       string
-	username   string
-	password   string
 }
 
 // GetSchema

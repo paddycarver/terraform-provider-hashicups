@@ -19,7 +19,7 @@ type resourceOrderType struct{}
 func (r resourceOrderType) GetSchema(_ context.Context) (schema.Schema, []*tfprotov6.Diagnostic) {
 	return schema.Schema{
 		Attributes: map[string]schema.Attribute{
-			"orderID": {
+			"order_id": {
 				Type:     types.StringType,
 				Computed: true,
 			},
@@ -92,14 +92,14 @@ type resourceCoffeeData struct {
 }
 
 type resourceItemData struct {
-	coffee   resourceCoffeeData
-	quantity int `tfsdk:"quantity"`
+	Coffee   resourceCoffeeData `tfsdk:"coffee"`
+	Quantity int                `tfsdk:"quantity"`
 }
 
 type resourceOrderData struct {
-	items        []resourceItemData `tfsdk:"items"`
-	last_updated types.String       `tfsdk:"last_updated"`
-	orderID      int                `tfsdk:"orderID"`
+	Items        []resourceItemData `tfsdk:"items"`
+	Last_updated types.String       `tfsdk:"last_updated"`
+	OrderID      int                `tfsdk:"order_id"`
 }
 
 //create a new resource
@@ -125,12 +125,12 @@ func (r resourceOrder) Create(ctx context.Context, req tfsdk.CreateResourceReque
 
 	var items []hashicups.OrderItem
 
-	for _, item := range ticket.items {
+	for _, item := range ticket.Items {
 		items = append(items, hashicups.OrderItem{
 			Coffee: hashicups.Coffee{
-				ID: item.coffee.ID,
+				ID: item.Coffee.ID,
 			},
-			Quantity: item.quantity,
+			Quantity: item.Quantity,
 		})
 	}
 	order, err := r.p.client.CreateOrder(items)
@@ -142,17 +142,17 @@ func (r resourceOrder) Create(ctx context.Context, req tfsdk.CreateResourceReque
 		})
 		return
 	}
-	ticket.orderID = order.ID
+	ticket.OrderID = order.ID
 	now := time.Now().Format(time.RFC850)
-	ticket.last_updated = types.String{Value: string(now)}
-	for _, planItem := range ticket.items {
+	ticket.Last_updated = types.String{Value: string(now)}
+	for _, planItem := range ticket.Items {
 		for _, item := range order.Items {
-			if item.Coffee.ID == planItem.coffee.ID {
-				planItem.coffee.Name = types.String{Value: item.Coffee.Name}
-				planItem.coffee.Teaser = types.String{Value: item.Coffee.Teaser}
-				planItem.coffee.Description = types.String{Value: item.Coffee.Description}
-				planItem.coffee.Price = item.Coffee.Price
-				planItem.coffee.Image = types.String{Value: item.Coffee.Image}
+			if item.Coffee.ID == planItem.Coffee.ID {
+				planItem.Coffee.Name = types.String{Value: item.Coffee.Name}
+				planItem.Coffee.Teaser = types.String{Value: item.Coffee.Teaser}
+				planItem.Coffee.Description = types.String{Value: item.Coffee.Description}
+				planItem.Coffee.Price = item.Coffee.Price
+				planItem.Coffee.Image = types.String{Value: item.Coffee.Image}
 			}
 		}
 	}
@@ -183,7 +183,7 @@ func (r resourceOrder) Read(ctx context.Context, req tfsdk.ReadResourceRequest, 
 	// get order from API and then update what is in state from what the API returns
 
 	//Set on state var state resourceOrderData will hold what the API returns
-	order, err := r.p.client.GetOrder(strconv.Itoa(state.orderID))
+	order, err := r.p.client.GetOrder(strconv.Itoa(state.OrderID))
 	if err != nil {
 		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
 			Severity: tfprotov6.DiagnosticSeverityError,
@@ -193,10 +193,10 @@ func (r resourceOrder) Read(ctx context.Context, req tfsdk.ReadResourceRequest, 
 		return
 	}
 
-	state.items = []resourceItemData{}
+	state.Items = []resourceItemData{}
 	for _, item := range order.Items {
-		state.items = append(state.items, resourceItemData{
-			coffee: resourceCoffeeData{
+		state.Items = append(state.Items, resourceItemData{
+			Coffee: resourceCoffeeData{
 				Name:        types.String{Value: item.Coffee.Name},
 				Teaser:      types.String{Value: item.Coffee.Teaser},
 				Description: types.String{Value: item.Coffee.Description},
@@ -204,7 +204,7 @@ func (r resourceOrder) Read(ctx context.Context, req tfsdk.ReadResourceRequest, 
 				Image:       types.String{Value: item.Coffee.Image},
 				ID:          item.Coffee.ID,
 			},
-			quantity: item.Quantity,
+			Quantity: item.Quantity,
 		})
 	}
 
@@ -243,15 +243,15 @@ func (r resourceOrder) Update(ctx context.Context, req tfsdk.UpdateResourceReque
 
 	var items []hashicups.OrderItem
 
-	for _, item := range plan.items {
+	for _, item := range plan.Items {
 		items = append(items, hashicups.OrderItem{
 			Coffee: hashicups.Coffee{
-				ID: item.coffee.ID,
+				ID: item.Coffee.ID,
 			},
-			Quantity: item.quantity,
+			Quantity: item.Quantity,
 		})
 	}
-	order, err := r.p.client.UpdateOrder(strconv.Itoa(state.orderID), []hashicups.OrderItem{})
+	order, err := r.p.client.UpdateOrder(strconv.Itoa(state.OrderID), []hashicups.OrderItem{})
 	if err != nil {
 		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
 			Severity: tfprotov6.DiagnosticSeverityError,
@@ -260,10 +260,10 @@ func (r resourceOrder) Update(ctx context.Context, req tfsdk.UpdateResourceReque
 		})
 		return
 	}
-	state.items = []resourceItemData{}
+	state.Items = []resourceItemData{}
 	for _, item := range order.Items {
-		state.items = append(state.items, resourceItemData{
-			coffee: resourceCoffeeData{
+		state.Items = append(state.Items, resourceItemData{
+			Coffee: resourceCoffeeData{
 				Name:        types.String{Value: item.Coffee.Name},
 				Teaser:      types.String{Value: item.Coffee.Teaser},
 				Description: types.String{Value: item.Coffee.Description},
@@ -271,7 +271,7 @@ func (r resourceOrder) Update(ctx context.Context, req tfsdk.UpdateResourceReque
 				Image:       types.String{Value: item.Coffee.Image},
 				ID:          item.Coffee.ID,
 			},
-			quantity: item.Quantity,
+			Quantity: item.Quantity,
 		})
 	}
 	err = resp.State.Set(ctx, order)
@@ -301,12 +301,12 @@ func (r resourceOrder) Delete(ctx context.Context, req tfsdk.DeleteResourceReque
 	// original framework test provider created a file on the file system and needed to destroy an on disk
 	// Would delete in hashicups be removing the item from the state and API?
 	//call hashicups API for DeleteOrder
-	err = r.p.client.DeleteOrder(strconv.Itoa(state.orderID))
+	err = r.p.client.DeleteOrder(strconv.Itoa(state.OrderID))
 	if err != nil {
 		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
 			Severity: tfprotov6.DiagnosticSeverityError,
 			Summary:  "Error deleting order",
-			Detail:   "Could not delete orderID " + strconv.Itoa(state.orderID) + ": " + err.Error(),
+			Detail:   "Could not delete orderID " + strconv.Itoa(state.OrderID) + ": " + err.Error(),
 		})
 		return
 	}
