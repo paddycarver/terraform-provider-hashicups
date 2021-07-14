@@ -3,6 +3,7 @@ package hashicups
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"strconv"
 	"time"
 
@@ -19,8 +20,8 @@ type resourceOrderType struct{}
 func (r resourceOrderType) GetSchema(_ context.Context) (schema.Schema, []*tfprotov6.Diagnostic) {
 	return schema.Schema{
 		Attributes: map[string]schema.Attribute{
-			"order_id": {
-				Type:     types.StringType,
+			"orderid": {
+				Type:     types.NumberType,
 				Computed: true,
 			},
 			"last_updated": {
@@ -32,12 +33,16 @@ func (r resourceOrderType) GetSchema(_ context.Context) (schema.Schema, []*tfpro
 				//tf will throw error if user doesn't specify palue - optional - can or choose not to supply a value
 				Required: false,
 				Attributes: schema.ListNestedAttributes(map[string]schema.Attribute{
-					"coffee": {
+					"quantity": {
+						Type:     types.NumberType,
 						Required: true,
-						Attributes: schema.ListNestedAttributes(map[string]schema.Attribute{
-							"id": {
+					},
+					"coffee": {
+						Required: false,
+						Attributes: schema.SingleNestedAttributes(map[string]schema.Attribute{
+							"orderid": {
 								Type:     types.NumberType,
-								Required: true,
+								Computed: true,
 							},
 							"name": {
 								Type:     types.StringType,
@@ -59,11 +64,7 @@ func (r resourceOrderType) GetSchema(_ context.Context) (schema.Schema, []*tfpro
 								Type:     types.StringType,
 								Computed: true,
 							},
-						}, schema.ListNestedAttributesOptions{}),
-					},
-					"quantity": {
-						Type:     types.NumberType,
-						Required: true,
+						}),
 					},
 				}, schema.ListNestedAttributesOptions{}),
 			},
@@ -83,7 +84,7 @@ type resourceOrder struct {
 }
 
 type resourceCoffeeData struct {
-	ID          int          `tfsdk:"id"`
+	ID          int          `tfsdk:"orderid"`
 	Name        types.String `tfsdk:"name"`
 	Teaser      types.String `tfsdk:"teaser"`
 	Description types.String `tfsdk:"description"`
@@ -99,7 +100,7 @@ type resourceItemData struct {
 type resourceOrderData struct {
 	Items        []resourceItemData `tfsdk:"items"`
 	Last_updated types.String       `tfsdk:"last_updated"`
-	OrderID      int                `tfsdk:"order_id"`
+	OrderID      types.Number       `tfsdk:"orderid"`
 }
 
 //create a new resource
@@ -142,7 +143,7 @@ func (r resourceOrder) Create(ctx context.Context, req tfsdk.CreateResourceReque
 		})
 		return
 	}
-	ticket.OrderID = order.ID
+	ticket.OrderID = types.Number{Value: big.NewFloat(float64(order.ID))}
 	now := time.Now().Format(time.RFC850)
 	ticket.Last_updated = types.String{Value: string(now)}
 	for _, planItem := range ticket.Items {
@@ -183,15 +184,16 @@ func (r resourceOrder) Read(ctx context.Context, req tfsdk.ReadResourceRequest, 
 	// get order from API and then update what is in state from what the API returns
 
 	//Set on state var state resourceOrderData will hold what the API returns
-	order, err := r.p.client.GetOrder(strconv.Itoa(state.OrderID))
-	if err != nil {
+	orderID, acc := state.OrderID.Value.Int64()
+	if acc != big.Exact {
 		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
 			Severity: tfprotov6.DiagnosticSeverityError,
-			Summary:  "Error creating order",
-			Detail:   "Could not create order, unexpected error: " + err.Error(),
+			Summary:  "Invalid Order ID",
+			Detail:   "OrderID must be an integer, cannot be a float.",
 		})
 		return
 	}
+	order, err := r.p.client.GetOrder(strconv.FormatInt(orderID, 10))
 
 	state.Items = []resourceItemData{}
 	for _, item := range order.Items {
@@ -251,15 +253,19 @@ func (r resourceOrder) Update(ctx context.Context, req tfsdk.UpdateResourceReque
 			Quantity: item.Quantity,
 		})
 	}
-	order, err := r.p.client.UpdateOrder(strconv.Itoa(state.OrderID), []hashicups.OrderItem{})
-	if err != nil {
+
+	orderID, acc := state.OrderID.Value.Int64()
+
+	if acc != big.Exact {
 		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
 			Severity: tfprotov6.DiagnosticSeverityError,
-			Summary:  "Error updating order",
-			Detail:   "Could not update order, unexpected error: " + err.Error(),
+			Summary:  "Error updating OrderID",
+			Detail:   "OrderID must be an integer, cannot be a float.",
 		})
 		return
 	}
+	order, err := r.p.client.UpdateOrder(strconv.FormatInt(orderID, 10), []hashicups.OrderItem{})
+
 	state.Items = []resourceItemData{}
 	for _, item := range order.Items {
 		state.Items = append(state.Items, resourceItemData{
@@ -301,12 +307,23 @@ func (r resourceOrder) Delete(ctx context.Context, req tfsdk.DeleteResourceReque
 	// original framework test provider created a file on the file system and needed to destroy an on disk
 	// Would delete in hashicups be removing the item from the state and API?
 	//call hashicups API for DeleteOrder
-	err = r.p.client.DeleteOrder(strconv.Itoa(state.OrderID))
+	orderID, acc := state.OrderID.Value.Int64()
+
+	if acc != big.Exact {
+		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
+			Severity: tfprotov6.DiagnosticSeverityError,
+			Summary:  "Invalid Order ID",
+			Detail:   "OrderID must be an integer, cannot be a float.",
+		})
+		return
+	}
+
+	err = r.p.client.DeleteOrder(strconv.FormatInt(orderID, 10))
 	if err != nil {
 		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
 			Severity: tfprotov6.DiagnosticSeverityError,
 			Summary:  "Error deleting order",
-			Detail:   "Could not delete orderID " + strconv.Itoa(state.OrderID) + ": " + err.Error(),
+			Detail:   "Could not delete orderID " + strconv.FormatInt(orderID, 10) + ": " + err.Error(),
 		})
 		return
 	}
