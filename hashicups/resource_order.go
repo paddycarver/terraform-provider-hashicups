@@ -47,22 +47,27 @@ func (r resourceOrderType) GetSchema(_ context.Context) (schema.Schema, []*tfpro
 							"name": {
 								Type:     types.StringType,
 								Computed: true,
+								Required: false,
 							},
 							"teaser": {
 								Type:     types.StringType,
 								Computed: true,
+								Required: false,
 							},
 							"description": {
 								Type:     types.StringType,
 								Computed: true,
+								Required: false,
 							},
 							"price": {
 								Type:     types.NumberType,
 								Computed: true,
+								Required: false,
 							},
 							"image": {
 								Type:     types.StringType,
 								Computed: true,
+								Required: false,
 							},
 						}),
 					},
@@ -157,7 +162,7 @@ func (r resourceOrder) Create(ctx context.Context, req tfsdk.CreateResourceReque
 			}
 		}
 	}
-	err = resp.State.Set(ctx, order)
+	err = resp.State.Set(ctx, ticket)
 	if err != nil {
 		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
 			Severity: tfprotov6.DiagnosticSeverityError,

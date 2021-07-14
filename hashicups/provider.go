@@ -152,7 +152,7 @@ func (p *provider) Configure(ctx context.Context, req tfsdk.ConfigureProviderReq
 
 	//repeat for password & host
 
-	c, err := hashicups.NewClient(&config.Host.Value, nil, nil)
+	c, err := hashicups.NewClient(&host, &username, &password)
 	if err != nil {
 		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
 			Severity: tfprotov6.DiagnosticSeverityError,
