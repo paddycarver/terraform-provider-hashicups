@@ -30,7 +30,7 @@ func (r resourceOrderType) GetSchema(_ context.Context) (schema.Schema, []*tfpro
 			},
 			"items": {
 				//tf will throw error if user doesn't specify palue - optional - can or choose not to supply a value
-				Required: true,
+				Required: false,
 				Attributes: schema.ListNestedAttributes(map[string]schema.Attribute{
 					"coffee": {
 						Required: true,
@@ -71,10 +71,6 @@ func (r resourceOrderType) GetSchema(_ context.Context) (schema.Schema, []*tfpro
 	}, nil
 }
 
-type resourceOrder struct {
-	p provider
-}
-
 // new resource instance
 func (r resourceOrderType) NewResource(_ context.Context, p tfsdk.Provider) (tfsdk.Resource, []*tfprotov6.Diagnostic) {
 	return resourceOrder{
@@ -82,8 +78,12 @@ func (r resourceOrderType) NewResource(_ context.Context, p tfsdk.Provider) (tfs
 	}, nil
 }
 
+type resourceOrder struct {
+	p provider
+}
+
 type resourceCoffeeData struct {
-	Id          int          `tfsdk:"id"`
+	ID          int          `tfsdk:"id"`
 	Name        types.String `tfsdk:"name"`
 	Teaser      types.String `tfsdk:"teaser"`
 	Description types.String `tfsdk:"description"`
@@ -97,9 +97,9 @@ type resourceItemData struct {
 }
 
 type resourceOrderData struct {
-	items        []resourceItemData
-	last_updated types.String `tfsdk:"last_updated"`
-	orderID      int          `tfsdk:"orderID"`
+	items        []resourceItemData `tfsdk:"items"`
+	last_updated types.String       `tfsdk:"last_updated"`
+	orderID      int                `tfsdk:"orderID"`
 }
 
 //create a new resource
@@ -128,7 +128,7 @@ func (r resourceOrder) Create(ctx context.Context, req tfsdk.CreateResourceReque
 	for _, item := range ticket.items {
 		items = append(items, hashicups.OrderItem{
 			Coffee: hashicups.Coffee{
-				ID: item.coffee.Id,
+				ID: item.coffee.ID,
 			},
 			Quantity: item.quantity,
 		})
@@ -147,7 +147,7 @@ func (r resourceOrder) Create(ctx context.Context, req tfsdk.CreateResourceReque
 	ticket.last_updated = types.String{Value: string(now)}
 	for _, planItem := range ticket.items {
 		for _, item := range order.Items {
-			if item.Coffee.ID == planItem.coffee.Id {
+			if item.Coffee.ID == planItem.coffee.ID {
 				planItem.coffee.Name = types.String{Value: item.Coffee.Name}
 				planItem.coffee.Teaser = types.String{Value: item.Coffee.Teaser}
 				planItem.coffee.Description = types.String{Value: item.Coffee.Description}
@@ -202,7 +202,7 @@ func (r resourceOrder) Read(ctx context.Context, req tfsdk.ReadResourceRequest, 
 				Description: types.String{Value: item.Coffee.Description},
 				Price:       item.Coffee.Price,
 				Image:       types.String{Value: item.Coffee.Image},
-				Id:          item.Coffee.ID,
+				ID:          item.Coffee.ID,
 			},
 			quantity: item.Quantity,
 		})
@@ -246,7 +246,7 @@ func (r resourceOrder) Update(ctx context.Context, req tfsdk.UpdateResourceReque
 	for _, item := range plan.items {
 		items = append(items, hashicups.OrderItem{
 			Coffee: hashicups.Coffee{
-				ID: item.coffee.Id,
+				ID: item.coffee.ID,
 			},
 			Quantity: item.quantity,
 		})
@@ -269,7 +269,7 @@ func (r resourceOrder) Update(ctx context.Context, req tfsdk.UpdateResourceReque
 				Description: types.String{Value: item.Coffee.Description},
 				Price:       item.Coffee.Price,
 				Image:       types.String{Value: item.Coffee.Image},
-				Id:          item.Coffee.ID,
+				ID:          item.Coffee.ID,
 			},
 			quantity: item.Quantity,
 		})

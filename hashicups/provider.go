@@ -20,6 +20,9 @@ func New() tfsdk.Provider {
 type provider struct {
 	configured bool
 	client     *hashicups.Client
+	host       string
+	username   string
+	password   string
 }
 
 // GetSchema
@@ -49,9 +52,9 @@ func (p *provider) GetSchema(_ context.Context) (schema.Schema, []*tfprotov6.Dia
 // Configure
 
 type providerData struct {
-	username types.String `tfsdk:"username"`
-	host     types.String `tfsdk:"host"`
-	password types.String `tfsdk:"password"`
+	Username types.String `tfsdk:"username"`
+	Host     types.String `tfsdk:"host"`
+	Password types.String `tfsdk:"password"`
 }
 
 func (p *provider) Configure(ctx context.Context, req tfsdk.ConfigureProviderRequest, resp *tfsdk.ConfigureProviderResponse) {
@@ -71,7 +74,7 @@ func (p *provider) Configure(ctx context.Context, req tfsdk.ConfigureProviderReq
 
 	var username string
 
-	if config.username.Unknown {
+	if config.Username.Unknown {
 		//cannot connect to client with an unknown value
 		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
 			Severity: tfprotov6.DiagnosticSeverityWarning,
@@ -81,10 +84,10 @@ func (p *provider) Configure(ctx context.Context, req tfsdk.ConfigureProviderReq
 		return
 	}
 
-	if config.username.Null {
+	if config.Username.Null {
 		username = os.Getenv("HASHICUPS_USERNAME")
 	} else {
-		username = config.username.Value
+		username = config.Username.Value
 	}
 
 	if username == "" {
@@ -98,7 +101,7 @@ func (p *provider) Configure(ctx context.Context, req tfsdk.ConfigureProviderReq
 
 	var password string
 
-	if config.password.Unknown {
+	if config.Password.Unknown {
 		//cannot connect to client with an unknown value
 		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
 			Severity: tfprotov6.DiagnosticSeverityWarning,
@@ -108,10 +111,10 @@ func (p *provider) Configure(ctx context.Context, req tfsdk.ConfigureProviderReq
 		return
 	}
 
-	if config.password.Null {
+	if config.Password.Null {
 		password = os.Getenv("HASHICUPS_PASSWORD")
 	} else {
-		password = config.password.Value
+		password = config.Password.Value
 	}
 
 	if password == "" {
@@ -125,7 +128,7 @@ func (p *provider) Configure(ctx context.Context, req tfsdk.ConfigureProviderReq
 
 	var host string
 
-	if config.host.Unknown {
+	if config.Host.Unknown {
 		//cannot connect to client with an unknown value
 		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
 			Severity: tfprotov6.DiagnosticSeverityWarning,
@@ -135,10 +138,10 @@ func (p *provider) Configure(ctx context.Context, req tfsdk.ConfigureProviderReq
 		return
 	}
 
-	if config.host.Null {
+	if config.Host.Null {
 		host = os.Getenv("HASHICUPS_HOST")
 	} else {
-		host = config.host.Value
+		host = config.Host.Value
 	}
 
 	if host == "" {
@@ -152,7 +155,7 @@ func (p *provider) Configure(ctx context.Context, req tfsdk.ConfigureProviderReq
 
 	//repeat for password & host
 
-	c, err := hashicups.NewClient(&config.host.Value, nil, nil)
+	c, err := hashicups.NewClient(&config.Host.Value, nil, nil)
 	if err != nil {
 		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
 			Severity: tfprotov6.DiagnosticSeverityError,
@@ -162,6 +165,8 @@ func (p *provider) Configure(ctx context.Context, req tfsdk.ConfigureProviderReq
 		return
 	}
 	p.client = c
+	p.configured = true
+
 }
 
 // GetResources

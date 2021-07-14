@@ -1,13 +1,15 @@
 package main
 
 import (
-	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
+	"context"
 
 	"github.com/tr0njavolta/terraform-provider-hashicups/hashicups"
+
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 )
 
 func main() {
-	tfsdk.Serve(context.Background(), provider.New, tfsdk.ServeOpts{
+	tfsdk.Serve(context.Background(), hashicups.New, tfsdk.ServeOpts{
 		Name: "hashicups",
 	})
 }
