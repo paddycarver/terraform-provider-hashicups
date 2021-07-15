@@ -4,57 +4,82 @@ import (
 	"context"
 	"strconv"
 
-	hc "github.com/hashicorp-demoapp/hashicups-client-go"
+	"github.com/hashicorp/terraform-plugin-framework/schema"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+
+	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 )
 
-func dataSourceOrder() *schema.Resource {
-	return &schema.Resource{
-		ReadContext: dataSourceOrderRead,
-		Schema: map[string]*schema.Schema{
-			"id": &schema.Schema{
-				Type:     schema.TypeInt,
-				Required: true,
-			},
-			"items": &schema.Schema{
-				Type:     schema.TypeList,
+type dataSourceOrder struct{}
+
+func (r dataSourceOrder) GetSchema(_ context.Context) (schema.Schema, []*tfprotov6.Diagnostic) {
+	return schema.Schema{
+		Attributes: map[string]schema.Attribute{
+			"orderid": {
+				Type:     types.NumberType,
 				Computed: true,
-				Elem: &schema.Resource{
-					Schema: map[string]*schema.Schema{
-						"coffee_id": &schema.Schema{
-							Type:     schema.TypeInt,
-							Computed: true,
-						},
-						"coffee_name": &schema.Schema{
-							Type:     schema.TypeString,
-							Computed: true,
-						},
-						"coffee_teaser": &schema.Schema{
-							Type:     schema.TypeString,
-							Computed: true,
-						},
-						"coffee_description": &schema.Schema{
-							Type:     schema.TypeString,
-							Computed: true,
-						},
-						"coffee_price": &schema.Schema{
-							Type:     schema.TypeInt,
-							Computed: true,
-						},
-						"coffee_image": &schema.Schema{
-							Type:     schema.TypeString,
-							Computed: true,
-						},
-						"quantity": &schema.Schema{
-							Type:     schema.TypeInt,
-							Computed: true,
-						},
+			},
+			"last_updated": {
+				Type: types.StringType,
+				// provider will set value, user cannot specify
+				Computed: true,
+			},
+			"items": {
+				//tf will throw error if user doesn't specify palue - optional - can or choose not to supply a value
+				Required: false,
+				Attributes: schema.ListNestedAttributes(map[string]schema.Attribute{
+					"quantity": {
+						Type:     types.NumberType,
+						Required: true,
 					},
-				},
+					"coffee": {
+						Required: true,
+						Attributes: schema.SingleNestedAttributes(map[string]schema.Attribute{
+							"orderid": {
+								Type:     types.NumberType,
+								Computed: true,
+							},
+							"name": {
+								Type:     types.StringType,
+								Computed: true,
+							},
+							"teaser": {
+								Type:     types.StringType,
+								Computed: true,
+							},
+							"description": {
+								Type:     types.StringType,
+								Computed: true,
+							},
+							"price": {
+								Type:     types.NumberType,
+								Computed: true,
+							},
+							"image": {
+								Type:     types.StringType,
+								Computed: true,
+							},
+						}),
+					},
+				}, schema.ListNestedAttributesOptions{}),
 			},
 		},
-	}
+	}, nil
+}
+
+func (r dataSourceOrder) NewDataSource(_ context.Context, p tfsdk.Provider) (tfsdk.DataSourceType, []*tfprotov6.Diagnostic) {
+	return dataSourceOrderProvider{
+		p: *(p.(*provider)),
+}
+
+var dataSourceCoffeesOrderSchema = &tfprotov6.Schema{
+	Block: &tfprotov6.SchemaBlock{
+		Attributes: []*tfprotov6.SchemaAttribute{
+
+		},
+	},
 }
 
 func dataSourceOrderRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {

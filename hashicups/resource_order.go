@@ -38,7 +38,7 @@ func (r resourceOrderType) GetSchema(_ context.Context) (schema.Schema, []*tfpro
 						Required: true,
 					},
 					"coffee": {
-						Required: false,
+						Required: true,
 						Attributes: schema.SingleNestedAttributes(map[string]schema.Attribute{
 							"orderid": {
 								Type:     types.NumberType,
@@ -47,27 +47,22 @@ func (r resourceOrderType) GetSchema(_ context.Context) (schema.Schema, []*tfpro
 							"name": {
 								Type:     types.StringType,
 								Computed: true,
-								Required: false,
 							},
 							"teaser": {
 								Type:     types.StringType,
 								Computed: true,
-								Required: false,
 							},
 							"description": {
 								Type:     types.StringType,
 								Computed: true,
-								Required: false,
 							},
 							"price": {
 								Type:     types.NumberType,
 								Computed: true,
-								Required: false,
 							},
 							"image": {
 								Type:     types.StringType,
 								Computed: true,
-								Required: false,
 							},
 						}),
 					},
