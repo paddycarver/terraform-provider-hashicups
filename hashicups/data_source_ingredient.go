@@ -2,8 +2,6 @@ package hashicups
 
 import (
 	"context"
-	"fmt"
-	"strconv"
 
 	"github.com/hashicorp-demoapp/hashicups-client-go"
 	"github.com/hashicorp/terraform-plugin-framework/schema"
@@ -12,75 +10,90 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
+)
 
-func dataSourceIngredients() *schema.Resource {
-	return &schema.Resource{
-		ReadContext: dataSourceIngredientsRead,
-		Schema: map[string]*schema.Schema{
-			"coffee_id": &schema.Schema{
-				Type:     schema.TypeInt,
-				Required: true,
-			},
-			"ingredients": &schema.Schema{
-				Type:     schema.TypeList,
-				Computed: true,
-				Elem: &schema.Resource{
-					Schema: map[string]*schema.Schema{
-						"id": &schema.Schema{
-							Type:     schema.TypeInt,
-							Computed: true,
-						},
-						"name": &schema.Schema{
-							Type:     schema.TypeString,
-							Computed: true,
-						},
-						"quantity": &schema.Schema{
-							Type:     schema.TypeInt,
-							Computed: true,
-						},
-						"unit": &schema.Schema{
-							Type:     schema.TypeString,
-							Computed: true,
-						},
-					},
-				},
-			},
-		},
-	}
+type dataSourceIngredientsType struct {
+	p provider
 }
 
-func dataSourceIngredientsRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	c := m.(*hc.Client)
+func (r dataSourceIngredientsType) GetSchema(_ context.Context) (schema.Schema, []*tfprotov6.Diagnostic) {
+	return schema.Schema{
+		Attributes: map[string]schema.Attribute{
+			"coffee_id": {
+				Type:     types.NumberType,
+				Required: true,
+			},
+			"ingredients": {
+				Required: true,
+				Attributes: schema.SingleNestedAttributes(map[string]schema.Attribute{
+					"id": {
+						Type:     types.NumberType,
+						Computed: true,
+					},
+					"name": {
+						Type:     types.StringType,
+						Computed: true,
+					},
+					"quantity": {
+						Type:     types.StringType,
+						Computed: true,
+					},
+					"unit": {
+						Type:     types.StringType,
+						Computed: true,
+					},
+				}),
+			},
+		},
+	}, nil
+}
 
-	// // Warning or errors can be collected in a slice type
-	var diags diag.Diagnostics
+func (r dataSourceIngredientsType) NewDataSource(ctx context.Context, p tfsdk.Provider) (tfsdk.DataSource, []*tfprotov6.Diagnostic) {
+	return dataSourceCoffeesType{
+		p: *(p.(*provider)),
+	}, nil
+}
 
-	coffeeID := d.Get("coffee_id").(int)
-	cID := strconv.Itoa(coffeeID)
+var dataSourceIngredientsSchema = &tfprotov6.Schema{
+	Block: &tfprotov6.SchemaBlock{
+		Attributes: []*tfprotov6.SchemaAttribute{
+			{
+				Name:     "id",
+				Type:     tftypes.String,
+				Computed: true,
+			},
+			{
+				Name:     "name",
+				Computed: true,
+				Type:     tftypes.String,
+			},
+			{
+				Name:     "quantity",
+				Computed: true,
+				Type:     tftypes.String,
+			},
+			{
+				Name:     "unit",
+				Computed: true,
+				Type:     tftypes.String,
+			},
+		},
+	},
+}
 
-	ings, err := c.GetCoffeeIngredients(cID)
-	if err != nil {
-		return diag.FromErr(err)
-	}
+var dataSourceIngredientsTypeCoffeesType = tftypes.Object{
+	AttributeTypes: map[string]tftypes.Type{
+		"id":       tftypes.String,
+		"name":     tftypes.String,
+		"quantity": tftypes.String,
+		"unit":     tftypes.String,
+	},
+}
 
-	ingredients := make([]map[string]interface{}, 0)
+type dataSourceServeIngredients struct {
+	provider *resourceCoffeeData
+}
 
-	for _, v := range ings {
-		ingredient := make(map[string]interface{})
-
-		ingredient["id"] = v.ID
-		ingredient["name"] = fmt.Sprintf("ingredient - %+v", v.Name)
-		ingredient["quantity"] = v.Quantity
-		ingredient["unit"] = v.Unit
-
-		ingredients = append(ingredients, ingredient)
-	}
-
-	if err := d.Set("ingredients", ingredients); err != nil {
-		return diag.FromErr(err)
-	}
-
-	d.SetId(cID)
-
-	return diags
+func (r dataSourceIngredientsType) Read(ctx context.Context, p tfsdk.ReadDataSourceRequest, resp *tfsdk.ReadDataSourceResponse) {
+	r.p.client.GetCoffeeIngredients("1", []hashicups.Ingredient())
 }

@@ -177,8 +177,8 @@ func (p *provider) GetResources(_ context.Context) (map[string]tfsdk.ResourceTyp
 //GetDataSources
 func (p *provider) GetDataSources(_ context.Context) (map[string]tfsdk.DataSourceType, []*tfprotov6.Diagnostic) {
 	return map[string]tfsdk.DataSourceType{
-		"hashicups_coffees": dataSourceCoffeesType{},
-		//	"hashicups_ingredients": dataSourceIngredientsType{},
-		//	"hashicups_order":       dataSourceOrderType{},
+		"hashicups_coffees":     dataSourceCoffeesType{},
+		"hashicups_ingredients": dataSourceIngredientsType{},
+		"hashicups_order":       dataSourceOrderType{},
 	}, nil
 }

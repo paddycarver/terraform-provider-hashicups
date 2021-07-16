@@ -11,11 +11,11 @@ import (
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
-type dataSourceProvider struct {
+type dataSourceCoffeesType struct {
 	p provider
 }
 
-func (r dataSourceProvider) GetSchema(_ context.Context) (schema.Schema, []*tfprotov6.Diagnostic) {
+func (r dataSourceCoffeesType) GetSchema(_ context.Context) (schema.Schema, []*tfprotov6.Diagnostic) {
 	return schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"coffee": {
@@ -51,8 +51,8 @@ func (r dataSourceProvider) GetSchema(_ context.Context) (schema.Schema, []*tfpr
 	}, nil
 }
 
-func (r dataSourceOrder) NewDataSource(_ context.Context, p tfsdk.Provider) (tfsdk.Resource, []*tfprotov6.Diagnostic) {
-	return resourceOrder{
+func (r dataSourceCoffeesType) NewDataSource(ctx context.Context, p tfsdk.Provider) (tfsdk.DataSource, []*tfprotov6.Diagnostic) {
+	return dataSourceCoffeesType{
 		p: *(p.(*provider)),
 	}, nil
 }
@@ -110,6 +110,6 @@ type dataSourceServeCoffee struct {
 	provider *resourceCoffeeData
 }
 
-func (r dataSourceServeCoffee) Read(ctx context.Context, req tfsdk.ReadDataSourceRequest, resp *tfsdk.ReadDataSourceResponse) {
-
+func (r dataSourceCoffeesType) Read(ctx context.Context, p tfsdk.ReadDataSourceRequest, resp *tfsdk.ReadDataSourceResponse) {
+	r.p.client.GetCoffees()
 }
