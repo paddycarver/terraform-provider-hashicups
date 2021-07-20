@@ -60,25 +60,19 @@ type dataSourceCoffees struct {
 }
 
 func (r dataSourceCoffees) Read(ctx context.Context, p tfsdk.ReadDataSourceRequest, resp *tfsdk.ReadDataSourceResponse) {
-	fmt.Fprintln(stderr, "[DEBUG] Got state in provider:", p.Config.Raw)
-	var cof Coffee
-	err := p.Config.Get(ctx, &cof)
-	if err != nil {
-		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
-			Severity: tfprotov6.DiagnosticSeverityError,
-			Summary:  "Error reading coffees",
-			Detail:   "An unexpected error was encountered while reading the coffees: " + err.Error(),
-		})
-		return
-	}
+	fmt.Fprintln(stderr, "[DEBUG]-read-error1:", p.Config.Raw)
 
-	r.p.client.GetCoffees()
+	var state struct {
+		Coffee []Coffee `tfsdk:"coffees"`
+	}
+	err := p.Config.Get(ctx, &state)
+
 	if err != nil {
 		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
 			Severity: tfprotov6.DiagnosticSeverityError,
-			Summary:  "Error deleting order",
-			Detail:   "Could not return coffees " + err.Error(),
+			Summary:  "Error reading coffee",
+			Detail:   "An unexpected error was encountered while reading the datasource_coffee: " + err.Error(),
 		})
-		return
 	}
+	r.p.client.GetCoffees()
 }

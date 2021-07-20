@@ -57,9 +57,9 @@ type dataSourceIngredients struct {
 }
 
 func (r dataSourceIngredients) Read(ctx context.Context, p tfsdk.ReadDataSourceRequest, resp *tfsdk.ReadDataSourceResponse) {
-	fmt.Fprintln(stderr, "[DEBUG] Got state in provider:", p.Config.Raw)
+	fmt.Fprintln(stderr, "[DEBUG]-read-error2:", p.Config.Schema)
 	var ing Ingredient
-	err := p.Config.Get(ctx, &ing)
+	err := p.ProviderMeta.Get(ctx, &ing)
 	if err != nil {
 		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
 			Severity: tfprotov6.DiagnosticSeverityError,
