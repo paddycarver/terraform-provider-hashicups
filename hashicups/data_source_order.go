@@ -2,18 +2,17 @@ package hashicups
 
 import (
 	"context"
+	"fmt"
+	"math/big"
 	"strconv"
 
 	"github.com/hashicorp/terraform-plugin-framework/schema"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
-
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 )
 
-type dataSourceOrderType struct{
-	p provider
-}
+type dataSourceOrderType struct{}
 
 func (r dataSourceOrderType) GetSchema(_ context.Context) (schema.Schema, []*tfprotov6.Diagnostic) {
 	return schema.Schema{
@@ -23,16 +22,16 @@ func (r dataSourceOrderType) GetSchema(_ context.Context) (schema.Schema, []*tfp
 				Computed: true,
 			},
 			"items": {
-				//tf will throw error if user doesn't specify palue - optional - can or choose not to supply a value
+				//tf will throw error if user doesn't specify value - optional - can or choose not to supply a value
 				Required: false,
-				Attributes: schema.ListNestedAttributes(map[string]schema.Attribute{
+				Attributes: schema.SingleNestedAttributes(map[string]schema.Attribute{
 					"coffee_id": {
 						Type:     types.NumberType,
 						Required: true,
 					},
 					"coffee_name": {
 						Required: true,
-						Type: types.StringType,
+						Type:     types.StringType,
 					},
 					"coffee_teaser": {
 						Type:     types.StringType,
@@ -60,66 +59,119 @@ func (r dataSourceOrderType) GetSchema(_ context.Context) (schema.Schema, []*tfp
 	}, nil
 }
 
-func (r dataSourceOrderType) NewDataSource(_ context.Context, p tfsdk.Provider) (tfsdk.DataSourceType, []*tfprotov6.Diagnostic) {
-	return dataSourceOrderType{
+func (r dataSourceOrderType) NewDataSource(ctx context.Context, p tfsdk.Provider) (tfsdk.DataSource, []*tfprotov6.Diagnostic) {
+	return dataSourceOrder{
 		p: *(p.(*provider)),
+	}, nil
 }
 
-var dataSourceOrdersSchema = &tfprotov6.Schema{
-	Block: &tfprotov6.SchemaBlock{
-		Attributes: []*tfprotov6.SchemaAttribute{
-
-			{
-				Name:     "id",
-				Type:     tftypes.String,
-				Computed: true,
-			},
-			{
-				Name:     "items",
-				Computed: true,
-				Type:     tftypes.String,
-			},
-			{
-				Name:     "coffee_id",
-				Computed: true,
-				Type:     tftypes.String,
-			},
-			{
-				Name:     "coffee_name",
-				Computed: true,
-				Type:     tftypes.String,
-			},
-			{
-				Name:     "coffee_price",
-				Computed: true,
-				Type:     tftypes.String,
-			},
-			{
-				Name:     "coffee_image",
-				Computed: true,
-				Type:     tftypes.String,
-			},
-		},
-	},
+type dataSourceOrder struct {
+	p provider
+}
+type Order struct {
+	ID    types.Number `tfsdk:"id"`
+	Items []OrderItem  `tfsdk:"items"`
 }
 
-var dataSourceOrdersTypeCoffeesType = tftypes.Object{
-	AttributeTypes: map[string]tftypes.Type{
-		"name":        tftypes.String,
-		"orderid":     tftypes.String,
-		"teaser":      tftypes.String,
-		"description": tftypes.String,
-		"image":       tftypes.String,
-		"price":       tftypes.String,
-	},
+type OrderItem struct {
+	Coffee   Coffee `tfsdk:"coffee"`
+	Quantity int    `tfsdk:"quantity"`
 }
 
-type dataSourceServeOrder struct {
-	provider *dataSourceOrdersTypeCoffeesType
-
+type Coffee struct {
+	ID          int          `tfsdk:"id"`
+	Name        string       `tfsdk:"name"`
+	Teaser      string       `tfsdk:"teaser"`
+	Description string       `tfsdk:"description"`
+	Price       float64      `tfsdk:"price"`
+	Image       string       `tfsdk:"image"`
+	Ingredient  []Ingredient `tfsdk:"ingredients"`
 }
 
+// Ingredient -
+type Ingredient struct {
+	ID       int    `tfsdk:"id"`
+	Name     string `tfsdk:"name"`
+	Quantity int    `tfsdk:"quantity"`
+	Unit     string `tfsdk:"unit"`
+}
 
-func (r dataSourceOrderType) Read(ctx context.Context, p tfsdk.ReadDataSourceRequest, resp *tfsdk.ReadDataSourceResponse) {
-	r.p.client.GetOrder(orderID)
+// func (r dataSourceOrder) Read(ctx context.Context, p tfsdk.ReadDataSourceRequest, resp *tfsdk.ReadDataSourceResponse) {
+// 	fmt.Fprintln(stderr, "[DEBUG] Got state in provider:", p.Config.Raw)
+// 	var order Order
+// 	err := p.Config.Get(ctx, order)
+// 	if err != nil {
+// 		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
+// 			Severity: tfprotov6.DiagnosticSeverityError,
+// 			Summary:  "Error reading state",
+// 			Detail:   "An unexpected error was encountered while reading the state: " + err.Error(),
+// 		})
+// 		return
+// 	}
+// 	orderID, acc := order.ID.Value.Int64()
+// 	if acc != big.Exact {
+// 		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
+// 			Severity: tfprotov6.DiagnosticSeverityError,
+// 			Summary:  "Invalid Order ID",
+// 			Detail:   "OrderID must be an integer, cannot be a float.",
+// 		})
+// 		return
+// 	}
+// 	order, err := r.p.client.GetOrder(*orderID)
+// 	config.Items = []Order{}
+
+// 	for _, item := range order.Items {
+// 		order.Items = append(order.ID, Order{
+// 			Coffee: Coffee{
+// 				Name:        types.String{Value: item.Coffee.Name},
+// 				Teaser:      types.String{Value: item.Coffee.Teaser},
+// 				Description: types.String{Value: item.Coffee.Description},
+// 				Price:       item.Coffee.Price,
+// 				Image:       types.String{Value: item.Coffee.Image},
+// 				ID:          item.Coffee.ID,
+// 			},
+// 			Quantity: item.Quantity,
+// 		})
+// 	}
+
+// 	if err != nil {
+// 		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
+// 			Severity: tfprotov6.DiagnosticSeverityError,
+// 			Summary:  "Error setting state",
+// 			Detail:   "Unexpected error encountered trying to set new state: " + err.Error(),
+// 		})
+// 		return
+// 	}
+// }
+
+func (r dataSourceOrder) Read(ctx context.Context, p tfsdk.ReadDataSourceRequest, resp *tfsdk.ReadDataSourceResponse) {
+	fmt.Fprintln(stderr, "[DEBUG] Got state in provider:", p.Config.Raw)
+	var order Order
+	err := p.Config.Get(ctx, order)
+	if err != nil {
+		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
+			Severity: tfprotov6.DiagnosticSeverityError,
+			Summary:  "Error reading state",
+			Detail:   "An unexpected error was encountered while reading the state: " + err.Error(),
+		})
+		return
+	}
+	orderID, acc := order.ID.Value.Int64()
+	if acc != big.Exact {
+		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
+			Severity: tfprotov6.DiagnosticSeverityError,
+			Summary:  "Invalid Order ID",
+			Detail:   "OrderID must be an integer, cannot be a float.",
+		})
+		return
+	}
+
+	r.p.client.GetOrder(strconv.FormatInt(orderID, 10))
+	if err != nil {
+		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
+			Severity: tfprotov6.DiagnosticSeverityError,
+			Summary:  "Error deleting order",
+			Detail:   "Could not delete orderID " + strconv.FormatInt(orderID, 10) + ": " + err.Error(),
+		})
+	}
 }

@@ -2,48 +2,27 @@ package hashicups
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/hashicorp-demoapp/hashicups-client-go"
 	"github.com/hashicorp/terraform-plugin-framework/schema"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
-	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
-type dataSourceCoffeesType struct {
-	p provider
-}
+type dataSourceCoffeesType struct{}
 
 func (r dataSourceCoffeesType) GetSchema(_ context.Context) (schema.Schema, []*tfprotov6.Diagnostic) {
 	return schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"coffee": {
-				Required: true,
+				Computed: true,
 				Attributes: schema.SingleNestedAttributes(map[string]schema.Attribute{
-					"orderid": {
+					"id": {
+						Computed: true,
 						Type:     types.NumberType,
-						Computed: true,
-					},
-					"name": {
-						Type:     types.StringType,
-						Computed: true,
-					},
-					"teaser": {
-						Type:     types.StringType,
-						Computed: true,
-					},
-					"description": {
-						Type:     types.StringType,
-						Computed: true,
-					},
-					"price": {
-						Type:     types.NumberType,
-						Computed: true,
-					},
-					"image": {
-						Type:     types.StringType,
-						Computed: true,
 					},
 				}),
 			},
@@ -52,64 +31,58 @@ func (r dataSourceCoffeesType) GetSchema(_ context.Context) (schema.Schema, []*t
 }
 
 func (r dataSourceCoffeesType) NewDataSource(ctx context.Context, p tfsdk.Provider) (tfsdk.DataSource, []*tfprotov6.Diagnostic) {
-	return dataSourceCoffeesType{
+	return dataSourceCoffees{
 		p: *(p.(*provider)),
 	}, nil
 }
 
-var dataSourceCoffeesSchema = &tfprotov6.Schema{
-	Block: &tfprotov6.SchemaBlock{
-		Attributes: []*tfprotov6.SchemaAttribute{
-
-			{
-				Name:     "orderid",
-				Type:     tftypes.String,
-				Computed: true,
-			},
-			{
-				Name:     "name",
-				Computed: true,
-				Type:     tftypes.String,
-			},
-			{
-				Name:     "teaser",
-				Computed: true,
-				Type:     tftypes.String,
-			},
-			{
-				Name:     "description",
-				Computed: true,
-				Type:     tftypes.String,
-			},
-			{
-				Name:     "price",
-				Computed: true,
-				Type:     tftypes.String,
-			},
-			{
-				Name:     "image",
-				Computed: true,
-				Type:     tftypes.String,
-			},
-		},
-	},
+type dataSourceCoffees struct {
+	p provider
 }
 
-var dataSourceCoffeesTypeCoffeesType = tftypes.Object{
-	AttributeTypes: map[string]tftypes.Type{
-		"name":        tftypes.String,
-		"orderid":     tftypes.String,
-		"teaser":      tftypes.String,
-		"description": tftypes.String,
-		"image":       tftypes.String,
-		"price":       tftypes.String,
-	},
+type dataSourceCoffeesData struct {
+	ID          types.Number                `tfsdk:"id"`
+	Name        types.String                `tfsdk:"name"`
+	Teaser      types.String                `tfsdk:"teaser"`
+	Description types.String                `tfsdk:"description"`
+	Price       types.Number                `tfsdk:"price"`
+	Image       types.String                `tfsdk:"image"`
+	Ingredient  []dataSourceIngredientsData `tfsdk:"ingredients"`
 }
 
-type dataSourceServeCoffee struct {
-	provider *resourceCoffeeData
-}
+func (r dataSourceCoffees) Read(ctx context.Context, p tfsdk.ReadDataSourceRequest, resp *tfsdk.ReadDataSourceResponse) {
+	fmt.Fprintln(stderr, "[DEBUG] Got state in provider:", p.Config.Raw)
+	var order dataSourceCoffeesData
+	err := p.Config.Get(ctx, order)
+	if err != nil {
+		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
+			Severity: tfprotov6.DiagnosticSeverityError,
+			Summary:  "Error reading state",
+			Detail:   "An unexpected error was encountered while reading the state: " + err.Error(),
+		})
+		return
+	}
 
-func (r dataSourceCoffeesType) Read(ctx context.Context, p tfsdk.ReadDataSourceRequest, resp *tfsdk.ReadDataSourceResponse) {
-	r.p.client.GetCoffees()
+	coffees, err := r.p.client.GetCoffees()
+	if err != nil {
+		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
+			Severity: tfprotov6.DiagnosticSeverityError,
+			Summary:  "Error deleting order",
+			Detail:   "Could not + " + err.Error(),
+		})
+	}
+
+	var items []hashicups.Coffee
+
+	for _, item := range coffees {
+		coffees = append(items, hashicups.Coffee{
+			Name:        item.Name,
+			Teaser:      item.Teaser,
+			Description: item.Description,
+			ID:          item.ID,
+			Price:       item.Price,
+			Image:       item.Image,
+		})
+		return
+	}
 }
