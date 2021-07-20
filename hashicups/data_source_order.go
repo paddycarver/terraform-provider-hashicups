@@ -74,7 +74,7 @@ type Order struct {
 }
 
 type OrderItem struct {
-	Coffee   Coffee `tfsdk:"coffee"`
+	Coffee   Coffee `tfsdk:"coffees"`
 	Quantity int    `tfsdk:"quantity"`
 }
 
@@ -90,10 +90,10 @@ type Coffee struct {
 
 // Ingredient -
 type Ingredient struct {
-	ID       int    `tfsdk:"id"`
-	Name     string `tfsdk:"name"`
-	Quantity int    `tfsdk:"quantity"`
-	Unit     string `tfsdk:"unit"`
+	ID       types.Number `tfsdk:"id"`
+	Name     string       `tfsdk:"name"`
+	Quantity int          `tfsdk:"quantity"`
+	Unit     string       `tfsdk:"unit"`
 }
 
 // func (r dataSourceOrder) Read(ctx context.Context, p tfsdk.ReadDataSourceRequest, resp *tfsdk.ReadDataSourceResponse) {
@@ -147,7 +147,7 @@ type Ingredient struct {
 func (r dataSourceOrder) Read(ctx context.Context, p tfsdk.ReadDataSourceRequest, resp *tfsdk.ReadDataSourceResponse) {
 	fmt.Fprintln(stderr, "[DEBUG] Got state in provider:", p.Config.Raw)
 	var order Order
-	err := p.Config.Get(ctx, order)
+	err := p.Config.Get(ctx, &order)
 	if err != nil {
 		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
 			Severity: tfprotov6.DiagnosticSeverityError,
@@ -173,5 +173,6 @@ func (r dataSourceOrder) Read(ctx context.Context, p tfsdk.ReadDataSourceRequest
 			Summary:  "Error deleting order",
 			Detail:   "Could not delete orderID " + strconv.FormatInt(orderID, 10) + ": " + err.Error(),
 		})
+		return
 	}
 }

@@ -22,7 +22,7 @@ func (r dataSourceIngredientsType) GetSchema(_ context.Context) (schema.Schema, 
 				Required: true,
 			},
 			"ingredients": {
-				Required: true,
+				Computed: true,
 				Attributes: schema.SingleNestedAttributes(map[string]schema.Attribute{
 					"id": {
 						Type:     types.NumberType,
@@ -56,31 +56,21 @@ type dataSourceIngredients struct {
 	p provider
 }
 
-type dataSourceItemData struct {
-	ID       int          `tfsdk:"id"`
-	Name     types.String `tfsdk:"name"`
-	Quantity int          `tfsdk:"quantity"`
-	Unit     types.String `tfsdk:"unit"`
-}
-
-type dataSourceIngredientsData struct {
-	Ingredients []dataSourceItemData `tfsdk:"ingredients"`
-	CoffeeID    types.Number         `tfsdk:"coffee_id"`
-}
-
 func (r dataSourceIngredients) Read(ctx context.Context, p tfsdk.ReadDataSourceRequest, resp *tfsdk.ReadDataSourceResponse) {
 	fmt.Fprintln(stderr, "[DEBUG] Got state in provider:", p.Config.Raw)
-	var order dataSourceIngredientsData
-	err := p.Config.Get(ctx, order)
+	var ing Ingredient
+	err := p.Config.Get(ctx, &ing)
 	if err != nil {
 		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
 			Severity: tfprotov6.DiagnosticSeverityError,
-			Summary:  "Error reading state",
-			Detail:   "An unexpected error was encountered while reading the state: " + err.Error(),
+			Summary:  "Error reading ingredients",
+			Detail:   "An unexpected error was encountered while reading the ingredients: " + err.Error(),
 		})
 		return
 	}
-	orderID, acc := order.CoffeeID.Value.Int64()
+
+	ingID, acc := ing.ID.Value.Int64()
+
 	if acc != big.Exact {
 		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
 			Severity: tfprotov6.DiagnosticSeverityError,
@@ -89,23 +79,13 @@ func (r dataSourceIngredients) Read(ctx context.Context, p tfsdk.ReadDataSourceR
 		})
 		return
 	}
+	r.p.client.GetCoffeeIngredients(strconv.FormatInt(ingID, 10))
 
-	ings, err := r.p.client.GetCoffeeIngredients(strconv.FormatInt(orderID, 10))
 	if err != nil {
 		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
 			Severity: tfprotov6.DiagnosticSeverityError,
-			Summary:  "Error deleting order",
-			Detail:   "Could not delete orderID " + strconv.FormatInt(orderID, 10) + ": " + err.Error(),
-		})
-	}
-
-	order.Ingredients = []dataSourceItemData{}
-	for _, items := range ings {
-		order.Ingredients = append(order.Ingredients, dataSourceItemData{
-			Name:     types.String{Value: items.Name},
-			Quantity: items.Quantity,
-			Unit:     types.String{Value: items.Unit},
-			ID:       items.ID,
+			Summary:  "Error fomdomg order",
+			Detail:   "Could find ingredient " + strconv.FormatInt(ingID, 10) + ": " + err.Error(),
 		})
 		return
 	}
