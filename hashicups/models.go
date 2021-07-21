@@ -14,7 +14,7 @@ type OrderItem struct {
 
 // Coffee -
 type Coffee struct {
-	ID          int          `tfsdk:"id"`
+	ID          int          `tfsdk:"orderid"`
 	Name        string       `tfsdk:"name"`
 	Teaser      string       `tfsdk:"teaser"`
 	Description string       `tfsdk:"description"`
@@ -25,7 +25,7 @@ type Coffee struct {
 
 // Ingredient -
 type Ingredient struct {
-	ID       int    `tfsdk:"id"`
+	ID       int    `tfsdk:"ingredient_id"`
 	Name     string `tfsdk:"name"`
 	Quantity int    `tfsdk:"quantity"`
 	Unit     string `tfsdk:"unit"`

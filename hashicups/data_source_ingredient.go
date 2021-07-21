@@ -77,5 +77,7 @@ func (r dataSourceIngredients) Read(ctx context.Context, req tfsdk.ReadDataSourc
 			Severity: tfprotov6.DiagnosticSeverityError,
 			Summary:  "Error reading coffee2",
 		})
+
 	}
+
 }

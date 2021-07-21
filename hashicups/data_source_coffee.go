@@ -43,15 +43,15 @@ func (r dataSourceCoffeesType) GetSchema(_ context.Context) (schema.Schema, []*t
 						Type:     types.StringType,
 						Computed: true,
 					},
-					"ingredients": {
-						Computed: true,
-						Attributes: schema.ListNestedAttributes(map[string]schema.Attribute{
-							"ingredient_id": {
-								Computed: true,
-								Type:     types.NumberType,
-							},
-						}, schema.ListNestedAttributesOptions{}),
-					},
+					// "ingredients": {
+					// 	Computed: true,
+					// 	Attributes: schema.ListNestedAttributes(map[string]schema.Attribute{
+					// 		"ingredient_id": {
+					// 			Computed: true,
+					// 			Type:     types.NumberType,
+					// 		},
+					// 	}, schema.ListNestedAttributesOptions{}),
+					// },
 				}, schema.ListNestedAttributesOptions{}),
 			},
 		},
@@ -69,20 +69,38 @@ type dataSourceCoffees struct {
 }
 
 func (r dataSourceCoffees) Read(ctx context.Context, req tfsdk.ReadDataSourceRequest, resp *tfsdk.ReadDataSourceResponse) {
-	fmt.Fprintln(stderr, "[DEBUG]-read-error1:", req.Config.Raw)
+	fmt.Fprintf(stderr, "[DEBUG]-read-error1:%+v", req.Config.Raw)
 
 	var state struct {
 		OrderItem []Coffee `tfsdk:"coffees"`
+		//	Coffee    []Ingredient `tfsdk:"ingredient_id"`
 	}
 
+	state.OrderItem = make([]Coffee, 0)
+	//	state.Coffee = make([]Ingredient, 0)
+
 	i, acc := r.p.client.GetCoffees()
+
 	if acc != nil {
 		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
 			Severity: tfprotov6.DiagnosticSeverityError,
 			Summary:  "Error reading coffee2",
 		})
 	}
-	err := resp.State.Get(ctx, &state)
+
+	for _, c := range i {
+		state.OrderItem = append(state.OrderItem, Coffee{
+			Name:        c.Name,
+			Teaser:      c.Teaser,
+			Description: c.Description,
+			Price:       c.Price,
+			Image:       c.Image,
+			ID:          c.ID,
+		})
+	}
+	// err := resp.State.SetAttribute(ctx, tftypes.NewAttributePath().WithAttributeName("coffees"), i)
+	state.OrderItem = i
+	err := resp.State.Set(ctx, state)
 	if err != nil {
 		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
 			Severity: tfprotov6.DiagnosticSeverityError,
@@ -91,5 +109,4 @@ func (r dataSourceCoffees) Read(ctx context.Context, req tfsdk.ReadDataSourceReq
 		})
 		return
 	}
-
 }
