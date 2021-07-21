@@ -72,8 +72,7 @@ func (r dataSourceCoffees) Read(ctx context.Context, req tfsdk.ReadDataSourceReq
 	fmt.Fprintf(stderr, "[DEBUG]-read-error1:%+v", req.Config.Raw)
 
 	var state struct {
-		OrderItem     []Coffee       `tfsdk:"coffees"`
-		IngredientIDs []types.String `tfsdk:"ingredient_id"`
+		OrderItem []Coffee `tfsdk:"coffees"`
 	}
 
 	state.OrderItem = make([]Coffee, 0)
@@ -90,13 +89,9 @@ func (r dataSourceCoffees) Read(ctx context.Context, req tfsdk.ReadDataSourceReq
 	for _, c := range i {
 		var ingredientIDs []types.String
 		for _, ingredient := range c.Ingredient {
-			ingredientIDs = append(ingredientIDs, types.String{Value: ingredient.ID})
+			ingredientIDs = append(ingredientIDs, types.String{ingredient.ID})
 		}
 		state.OrderItem = append(state.OrderItem, Coffee{
-
-			Ingredient: []Ingredient{
-				ID: c.ID,
-			},
 			Name:        c.Name,
 			Teaser:      c.Teaser,
 			Description: c.Description,
