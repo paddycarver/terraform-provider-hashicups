@@ -1,7 +1,7 @@
 terraform {
   required_providers {
     hashicups = {
-      versions = ["0.2"]
+      version = "0.3"
       source = "hashicorp.com/edu/hashicups"
     }
   }
@@ -19,7 +19,6 @@ output "all_coffees" {
   value = data.hashicups_coffees.all.coffees
 }
 
-# Only returns packer spiced latte
 output "coffee" {
   value = {
     for coffee in data.hashicups_coffees.all.coffees :
