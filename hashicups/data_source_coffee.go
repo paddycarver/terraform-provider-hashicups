@@ -43,15 +43,15 @@ func (r dataSourceCoffeesType) GetSchema(_ context.Context) (schema.Schema, []*t
 						Type:     types.StringType,
 						Computed: true,
 					},
-					// "ingredients": {
-					// 	Computed: true,
-					// 	Attributes: schema.ListNestedAttributes(map[string]schema.Attribute{
-					// 		"ingredient_id": {
-					// 			Computed: true,
-					// 			Type:     types.NumberType,
-					// 		},
-					// 	}, schema.ListNestedAttributesOptions{}),
-					// },
+					"ingredients": {
+						Computed: true,
+						Attributes: schema.ListNestedAttributes(map[string]schema.Attribute{
+							"ingredient_id": {
+								Computed: true,
+								Type:     types.NumberType,
+							},
+						}, schema.ListNestedAttributesOptions{}),
+					},
 				}, schema.ListNestedAttributesOptions{}),
 			},
 		},
@@ -72,12 +72,11 @@ func (r dataSourceCoffees) Read(ctx context.Context, req tfsdk.ReadDataSourceReq
 	fmt.Fprintf(stderr, "[DEBUG]-read-error1:%+v", req.Config.Raw)
 
 	var state struct {
-		OrderItem []Coffee `tfsdk:"coffees"`
-		//	Coffee    []Ingredient `tfsdk:"ingredient_id"`
+		OrderItem     []Coffee       `tfsdk:"coffees"`
+		IngredientIDs []types.String `tfsdk:"ingredient_id"`
 	}
 
 	state.OrderItem = make([]Coffee, 0)
-	//	state.Coffee = make([]Ingredient, 0)
 
 	i, acc := r.p.client.GetCoffees()
 
@@ -89,7 +88,15 @@ func (r dataSourceCoffees) Read(ctx context.Context, req tfsdk.ReadDataSourceReq
 	}
 
 	for _, c := range i {
+		var ingredientIDs []types.String
+		for _, ingredient := range c.Ingredient {
+			ingredientIDs = append(ingredientIDs, types.String{Value: ingredient.ID})
+		}
 		state.OrderItem = append(state.OrderItem, Coffee{
+
+			Ingredient: []Ingredient{
+				ID: c.ID,
+			},
 			Name:        c.Name,
 			Teaser:      c.Teaser,
 			Description: c.Description,
@@ -99,7 +106,6 @@ func (r dataSourceCoffees) Read(ctx context.Context, req tfsdk.ReadDataSourceReq
 		})
 	}
 	// err := resp.State.SetAttribute(ctx, tftypes.NewAttributePath().WithAttributeName("coffees"), i)
-	state.OrderItem = i
 	err := resp.State.Set(ctx, state)
 	if err != nil {
 		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
