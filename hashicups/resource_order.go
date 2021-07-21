@@ -3,7 +3,6 @@ package hashicups
 import (
 	"context"
 	"fmt"
-	"math/big"
 	"strconv"
 
 	"github.com/hashicorp/terraform-plugin-framework/schema"
@@ -163,16 +162,11 @@ func (r resourceOrder) Read(ctx context.Context, req tfsdk.ReadResourceRequest, 
 	// get order from API and then update what is in state from what the API returns
 
 	//Set on state var state Order will hold what the API returns
-	orderID, acc := state.ID.Value.Int64()
-	if acc != big.Exact {
-		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
-			Severity: tfprotov6.DiagnosticSeverityError,
-			Summary:  "Invalid Order ID",
-			Detail:   "OrderID must be an integer, cannot be a float.",
-		})
-		return
-	}
-	order, err := r.p.client.GetOrder(strconv.FormatInt(orderID, 10))
+
+	t := strconv.Itoa(state.ID)
+	orderID := t
+
+	order, err := r.p.client.GetOrder(orderID)
 
 	state.Items = []OrderItem{}
 	for _, item := range order.Items {

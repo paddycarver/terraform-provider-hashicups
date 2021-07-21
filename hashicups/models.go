@@ -1,17 +1,18 @@
 package hashicups
 
-import "github.com/hashicorp/terraform-plugin-framework/types"
-
+// Order -
 type Order struct {
-	ID    types.Number `tfsdk:"id"`
-	Items []OrderItem  `tfsdk:"items"`
+	ID    int         `tfsdk:"id"`
+	Items []OrderItem `tfsdk:"items"`
 }
 
+// OrderItem -
 type OrderItem struct {
 	Coffee   Coffee `tfsdk:"coffee"`
 	Quantity int    `tfsdk:"quantity"`
 }
 
+// Coffee -
 type Coffee struct {
 	ID          int          `tfsdk:"id"`
 	Name        string       `tfsdk:"name"`
@@ -24,8 +25,8 @@ type Coffee struct {
 
 // Ingredient -
 type Ingredient struct {
-	ID       types.Number `tfsdk:"id"`
-	Name     string       `tfsdk:"name"`
-	Quantity int          `tfsdk:"quantity"`
-	Unit     string       `tfsdk:"unit"`
+	ID       int    `tfsdk:"id"`
+	Name     string `tfsdk:"name"`
+	Quantity int    `tfsdk:"quantity"`
+	Unit     string `tfsdk:"unit"`
 }

@@ -3,7 +3,6 @@ package hashicups
 import (
 	"context"
 	"fmt"
-	"math/big"
 	"strconv"
 
 	"github.com/hashicorp/terraform-plugin-framework/schema"
@@ -25,27 +24,27 @@ func (r dataSourceOrderType) GetSchema(_ context.Context) (schema.Schema, []*tfp
 				//tf will throw error if user doesn't specify value - optional - can or choose not to supply a value
 				Required: false,
 				Attributes: schema.SingleNestedAttributes(map[string]schema.Attribute{
-					"coffee_id": {
+					"id": {
 						Type:     types.NumberType,
 						Required: true,
 					},
-					"coffee_name": {
+					"name": {
 						Required: true,
 						Type:     types.StringType,
 					},
-					"coffee_teaser": {
+					"teaser": {
 						Type:     types.StringType,
 						Required: true,
 					},
-					"coffee_description": {
+					"description": {
 						Type:     types.StringType,
 						Required: true,
 					},
-					"coffee_price": {
+					"price": {
 						Type:     types.NumberType,
 						Required: true,
 					},
-					"coffee_image": {
+					"image": {
 						Type:     types.StringType,
 						Required: true,
 					},
@@ -69,28 +68,23 @@ type dataSourceOrder struct {
 	p provider
 }
 
-func (r dataSourceOrder) Read(ctx context.Context, p tfsdk.ReadDataSourceRequest, resp *tfsdk.ReadDataSourceResponse) {
-	fmt.Fprintln(stderr, "[DEBUG]-read-error3:", p.Config.Schema)
+func (r dataSourceOrder) Read(ctx context.Context, req tfsdk.ReadDataSourceRequest, resp *tfsdk.ReadDataSourceResponse) {
+	fmt.Fprintln(stderr, "[DEBUG]-read-error3:", req.Config.Raw)
 
 	var state Order
-	err := p.ProviderMeta.Get(ctx, &state)
+	err := req.Config.Get(ctx, &state)
 	if err != nil {
 		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
 			Severity: tfprotov6.DiagnosticSeverityError,
-			Summary:  "Error reading coffee",
+			Summary:  "Error reading coffee5",
 			Detail:   "An unexpected error was encountered while reading the datasource_coffee: " + err.Error(),
 		})
 		return
 	}
-	orderID, acc := state.ID.Value.Int64()
 
-	if acc != big.Exact {
-		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
-			Severity: tfprotov6.DiagnosticSeverityError,
-			Summary:  "Invalid Order ID",
-			Detail:   "OrderID must be an integer, cannot be a float.",
-		})
-		return
-	}
-	r.p.client.GetCoffeeIngredients(strconv.FormatInt(orderID, 10))
+	t := strconv.Itoa(state.ID)
+
+	orderID := t
+
+	r.p.client.GetCoffeeIngredients(orderID)
 }

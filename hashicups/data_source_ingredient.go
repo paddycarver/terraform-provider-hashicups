@@ -3,7 +3,6 @@ package hashicups
 import (
 	"context"
 	"fmt"
-	"math/big"
 	"strconv"
 
 	"github.com/hashicorp/terraform-plugin-framework/schema"
@@ -56,10 +55,10 @@ type dataSourceIngredients struct {
 	p provider
 }
 
-func (r dataSourceIngredients) Read(ctx context.Context, p tfsdk.ReadDataSourceRequest, resp *tfsdk.ReadDataSourceResponse) {
-	fmt.Fprintln(stderr, "[DEBUG]-read-error2:", p.Config.Schema)
+func (r dataSourceIngredients) Read(ctx context.Context, req tfsdk.ReadDataSourceRequest, resp *tfsdk.ReadDataSourceResponse) {
+	fmt.Fprintln(stderr, "[DEBUG]-read-error2:", req.Config.Schema)
 	var ing Ingredient
-	err := p.ProviderMeta.Get(ctx, &ing)
+	err := req.Config.Get(ctx, &ing)
 	if err != nil {
 		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
 			Severity: tfprotov6.DiagnosticSeverityError,
@@ -68,25 +67,15 @@ func (r dataSourceIngredients) Read(ctx context.Context, p tfsdk.ReadDataSourceR
 		})
 		return
 	}
+	t := strconv.Itoa(ing.ID)
 
-	ingID, acc := ing.ID.Value.Int64()
+	ingID := t
 
-	if acc != big.Exact {
-		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
-			Severity: tfprotov6.DiagnosticSeverityError,
-			Summary:  "Invalid Order ID",
-			Detail:   "OrderID must be an integer, cannot be a float.",
-		})
-		return
-	}
-	r.p.client.GetCoffeeIngredients(strconv.FormatInt(ingID, 10))
-
+	r.p.client.GetCoffeeIngredients(ingID)
 	if err != nil {
 		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
 			Severity: tfprotov6.DiagnosticSeverityError,
-			Summary:  "Error fomdomg order",
-			Detail:   "Could find ingredient " + strconv.FormatInt(ingID, 10) + ": " + err.Error(),
+			Summary:  "Error reading coffee2",
 		})
-		return
 	}
 }

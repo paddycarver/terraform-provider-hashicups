@@ -43,6 +43,15 @@ func (r dataSourceCoffeesType) GetSchema(_ context.Context) (schema.Schema, []*t
 						Type:     types.StringType,
 						Computed: true,
 					},
+					"ingredients": {
+						Computed: true,
+						Attributes: schema.ListNestedAttributes(map[string]schema.Attribute{
+							"ingredient_id": {
+								Computed: true,
+								Type:     types.NumberType,
+							},
+						}, schema.ListNestedAttributesOptions{}),
+					},
 				}, schema.ListNestedAttributesOptions{}),
 			},
 		},
@@ -59,20 +68,28 @@ type dataSourceCoffees struct {
 	p provider
 }
 
-func (r dataSourceCoffees) Read(ctx context.Context, p tfsdk.ReadDataSourceRequest, resp *tfsdk.ReadDataSourceResponse) {
-	fmt.Fprintln(stderr, "[DEBUG]-read-error1:", p.Config.Raw)
+func (r dataSourceCoffees) Read(ctx context.Context, req tfsdk.ReadDataSourceRequest, resp *tfsdk.ReadDataSourceResponse) {
+	fmt.Fprintln(stderr, "[DEBUG]-read-error1:", req.Config.Raw)
 
 	var state struct {
-		Coffee []Coffee `tfsdk:"coffees"`
+		OrderItem []Coffee `tfsdk:"coffees"`
 	}
-	err := p.Config.Get(ctx, &state)
 
+	i, acc := r.p.client.GetCoffees()
+	if acc != nil {
+		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
+			Severity: tfprotov6.DiagnosticSeverityError,
+			Summary:  "Error reading coffee2",
+		})
+	}
+	err := resp.State.Get(ctx, &state)
 	if err != nil {
 		resp.Diagnostics = append(resp.Diagnostics, &tfprotov6.Diagnostic{
 			Severity: tfprotov6.DiagnosticSeverityError,
-			Summary:  "Error reading coffee",
-			Detail:   "An unexpected error was encountered while reading the datasource_coffee: " + err.Error(),
+			Summary:  "Error reading coffee1",
+			Detail:   "An unexpected error was encountered while reading the datasource_coffee: " + fmt.Sprint(i) + err.Error(),
 		})
+		return
 	}
-	r.p.client.GetCoffees()
+
 }
