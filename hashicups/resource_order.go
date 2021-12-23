@@ -6,6 +6,7 @@ import (
 	"time"
 
 	hc "github.com/hashicorp-demoapp/hashicups-client-go"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
@@ -103,6 +104,10 @@ func resourceOrderCreate(ctx context.Context, d *schema.ResourceData, m interfac
 	if err != nil {
 		return diag.FromErr(err)
 	}
+
+	// see https://pkg.go.dev/github.com/hashicorp/terraform-plugin-log/tflog
+	// for more information on logging from within your provider
+	tflog.Trace(ctx, "created order", "order_id", o.ID)
 
 	d.SetId(strconv.Itoa(o.ID))
 
